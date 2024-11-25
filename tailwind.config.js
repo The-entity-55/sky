@@ -84,8 +84,7 @@ module.exports = {
     },
   },
   plugins: [
-    require("tailwindcss-animate"),
     require("@tailwindcss/forms"),
-    require("tailwindcss-radix"),
+    require("tailwindcss-radix")
   ],
 }

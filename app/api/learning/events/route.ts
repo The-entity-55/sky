@@ -51,7 +51,7 @@ export async function GET(req: Request) {
         userId
       },
       {
-        type: "interaction",
+        type: "voice_interaction",
         subject: "chemistry",
         content: "Reviewed periodic table elements and their properties",
         timestamp: new Date(),

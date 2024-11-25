@@ -1,5 +1,5 @@
 export interface LearningEvent {
-  type: string
+  type: "question" | "note" | "voice_interaction"
   subject?: string
   content: string
   timestamp: Date

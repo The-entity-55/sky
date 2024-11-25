@@ -59,29 +59,32 @@ export class LearningAnalytics {
     }
   }
 
-  static async getPersonalizedTutoring(userId: string): Promise<PersonalizedTutoring> {
+  static async getPersonalizedTutoring(
+    userId: string,
+    events?: LearningEvent[]
+  ): Promise<PersonalizedTutoring> {
     try {
-      // Get recent learning events
-      const events = await LearningEventsDB.getByUserId(userId, { limit: 50 })
-      if (!events?.length) {
+      // Get recent learning events if not provided
+      const learningEvents = events || await LearningEventsDB.getByUserId(userId, { limit: 50 })
+      if (!learningEvents?.length) {
         throw new Error('No learning events found for user')
       }
 
       // Get learning pattern analysis
-      const pattern = await this.analyzeLearningPattern(events)
+      const pattern = await this.analyzeLearningPattern(learningEvents)
 
       // Get engagement metrics
       const stats = await LearningEventsDB.getStats(userId)
 
       // Calculate engagement metrics
       const engagementMetrics: EngagementMetrics = {
-        questionQuality: this.calculateQuestionQuality(events),
-        participationRate: this.calculateParticipationRate(events),
-        conceptConnections: this.calculateConceptConnections(events)
+        questionQuality: this.calculateQuestionQuality(learningEvents),
+        participationRate: this.calculateParticipationRate(learningEvents),
+        conceptConnections: this.calculateConceptConnections(learningEvents)
       }
 
       // Calculate attention patterns
-      const attentionPatterns = this.calculateAttentionPatterns(events)
+      const attentionPatterns = this.calculateAttentionPatterns(learningEvents)
 
       // Generate personalized recommendations
       const recommendations = await this.generateRecommendations(pattern, engagementMetrics)

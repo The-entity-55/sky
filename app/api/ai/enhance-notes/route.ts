@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { Configuration, OpenAIApi } from "openai"
+import OpenAI from "openai"
 import { auth } from '@clerk/nextjs'
 
 // Initialize OpenAI with error handling
@@ -8,8 +8,7 @@ const getOpenAIClient = () => {
   if (!apiKey) {
     throw new Error('OpenAI API key is not configured')
   }
-  const configuration = new Configuration({ apiKey })
-  return new OpenAIApi(configuration)
+  return new OpenAI({ apiKey })
 }
 
 export async function POST(req: Request) {
@@ -65,8 +64,8 @@ export async function POST(req: Request) {
     `
 
     // Make API call with error handling
-    const completion = await openai.createChatCompletion({
-      model: "gpt-4",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
@@ -87,7 +86,7 @@ export async function POST(req: Request) {
     })
 
     // Extract and validate the enhanced content
-    const enhancedContent = completion.data.choices[0]?.message?.content
+    const enhancedContent = completion.choices[0]?.message?.content
     if (!enhancedContent) {
       throw new Error('Failed to generate enhanced content')
     }

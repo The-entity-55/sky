@@ -1,21 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@clerk/nextjs"
-import Pusher from "pusher"
 import { supabase } from '@/lib/supabase'
 
-// Validate Pusher environment variables
-if (!process.env.PUSHER_APP_ID || !process.env.NEXT_PUBLIC_PUSHER_KEY || 
-    !process.env.PUSHER_SECRET || !process.env.NEXT_PUBLIC_PUSHER_CLUSTER) {
-  throw new Error('Missing Pusher environment variables')
-}
-
-const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID,
-  key: process.env.NEXT_PUBLIC_PUSHER_KEY,
-  secret: process.env.PUSHER_SECRET,
-  cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
-  useTLS: true,
-})
 
 interface MessageData {
   content: string
@@ -62,7 +48,7 @@ export async function POST(req: Request) {
 
       if (error) throw error
 
-      // Format message for response and Pusher
+      // Format message for response
       const formattedMessage = {
         id: message.id.toString(),
         content: message.content,
@@ -73,16 +59,10 @@ export async function POST(req: Request) {
         createdAt: message.created_at.toISOString(),
       }
 
-      // Trigger Pusher event
-      await pusher.trigger('chat', 'new-message', formattedMessage)
-
       return NextResponse.json(formattedMessage)
     } catch (error) {
-      console.error('Database or Pusher error:', error)
-      return NextResponse.json({ 
-        error: "Failed to save message", 
-        details: error instanceof Error ? error.message : 'Unknown error' 
-      }, { status: 500 })
+      console.error('Database error:', error)
+      return new NextResponse("Internal Error", { status: 500 })
     }
   } catch (error) {
     console.error('Request processing error:', error)

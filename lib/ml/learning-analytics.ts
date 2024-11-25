@@ -1,13 +1,12 @@
-import { Configuration, OpenAIApi } from 'openai'
+import OpenAI from 'openai';
 import { MLModelInterface } from './model-interface'
 import { type LearningEvent, type LearningPattern, type PersonalizedTutoring } from '@/types/learning'
 import { LearningEventsDB } from '@/lib/db/learning-events'
 
 // Initialize OpenAI client
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 })
-const openai = new OpenAIApi(configuration)
 
 // Add proper type for engagement metrics
 interface EngagementMetrics {
@@ -31,7 +30,7 @@ export class LearningAnalytics {
     `
 
     try {
-      const response = await openai.createChatCompletion({
+      const response = await openai.chat.completions.create({
         model: 'gpt-4',
         messages: [
           {
@@ -47,11 +46,11 @@ export class LearningAnalytics {
         max_tokens: 1000
       })
 
-      if (!response.data.choices[0].message?.content) {
+      if (!response.choices[0].message?.content) {
         throw new Error('No response from OpenAI')
       }
 
-      const analysis = JSON.parse(response.data.choices[0].message.content)
+      const analysis = JSON.parse(response.choices[0].message.content)
       return analysis as LearningPattern
     } catch (error) {
       console.error('Error analyzing learning pattern:', error)

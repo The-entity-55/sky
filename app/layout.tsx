@@ -1,36 +1,26 @@
-import { ClerkProvider } from "@/components/providers/clerk-provider"
-import { Navbar } from "@/components/navbar"
-import { Toaster } from "@/components/ui/toaster"
-import { AnimatedBackground } from "@/components/animated-background"
-import { cn } from "@/lib/utils"
-import "@/app/globals.css"
-import type { Metadata } from "next"
-import { Poppins } from "next/font/google"
+import './globals.css'
+import { Inter } from 'next/font/google'
+import { ClerkProvider } from '@/components/providers/clerk-provider'
+import { Toaster } from 'react-hot-toast'
 
-const poppins = Poppins({ 
-  weight: ['400', '500', '600', '700'],
-  subsets: ['latin'],
-  display: 'swap',
-})
+const inter = Inter({ subsets: ['latin'] })
 
-export const metadata: Metadata = {
-  title: "Tutorflow - AI-Powered Learning Platform",
-  description: "Enhance your learning experience with AI-powered tutoring and progress tracking.",
+export const metadata = {
+  title: 'AI Tutor',
+  description: 'Your personal AI tutor',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-gradient-to-b from-white to-blue-50/50 relative", poppins.className)} suppressHydrationWarning>
-        <AnimatedBackground />
+    <html lang="en">
+      <body className={inter.className}>
         <ClerkProvider>
-          <div className="flex flex-col min-h-screen relative z-0">
-            <Navbar />
-            <main className="flex-1 overflow-y-auto">
-              {children}
-            </main>
-            <Toaster />
-          </div>
+          {children}
+          <Toaster />
         </ClerkProvider>
       </body>
     </html>

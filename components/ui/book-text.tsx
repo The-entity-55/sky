@@ -1,6 +1,6 @@
 "use client"
 
-import { BookText } from 'lucide-react'
+import { Book } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface BookTextProps {
@@ -16,7 +16,7 @@ export function BookTextItem({
 }: BookTextProps) {
   return (
     <li className={cn("flex items-center space-x-2", className)}>
-      <BookText className={cn("w-5 h-5 text-blue-500", iconClassName)} />
+      <Book className={cn("w-5 h-5 text-blue-500", iconClassName)} />
       <span>{text}</span>
     </li>
   )

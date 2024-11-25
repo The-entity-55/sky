@@ -51,6 +51,7 @@
     "class-variance-authority": "^0.7.0",
     "sonner": "^1.7.0",
     "svix": "^1.41.0",
+    "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.3.3"
   },
   "engines": {

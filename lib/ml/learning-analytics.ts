@@ -1,26 +1,19 @@
-import { OpenAI } from 'openai'
+import { Configuration, OpenAIApi } from 'openai'
 import { MLModelInterface } from './model-interface'
+import { type LearningEvent, type LearningPattern, type PersonalizedTutoring } from '@/types/learning'
+import { LearningEventsDB } from '@/lib/db/learning-events'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+// Initialize OpenAI client
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY
 })
+const openai = new OpenAIApi(configuration)
 
-interface LearningEvent {
-  type: 'question' | 'note' | 'voice_interaction'
-  subject?: string
-  content: string
-  timestamp: Date
-  userId: string
-}
-
-interface LearningPattern {
-  strongAreas: string[]
-  weakAreas: string[]
-  recommendedTopics: string[]
-  learningStyle: string
-  conceptualUnderstanding: {
-    [key: string]: number // Topic: Understanding level (0-1)
-  }
+// Add proper type for engagement metrics
+interface EngagementMetrics {
+  questionQuality: number
+  participationRate: number
+  conceptConnections: number
 }
 
 export class LearningAnalytics {
@@ -28,120 +21,152 @@ export class LearningAnalytics {
     const prompt = `
       Analyze these learning interactions and identify:
       1. Strong areas
-      2. Areas needing improvement
-      3. Recommended topics for further study
-      4. Learning style preferences
-      5. Conceptual understanding levels
+      2. Weak areas
+      3. Recommended topics
+      4. Learning style
+      5. Conceptual understanding levels (0-1)
 
       Learning events:
-      ${events.map(event => `
-        Type: ${event.type}
-        Subject: ${event.subject || 'N/A'}
-        Content: ${event.content}
-        Time: ${event.timestamp}
-      `).join('\n')}
+      ${JSON.stringify(events, null, 2)}
     `
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-    })
+    try {
+      const response = await openai.createChatCompletion({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an AI tutor analyzing student learning patterns. Provide analysis in JSON format.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      })
 
-    // Parse the AI response into structured data
-    const analysis = response.choices[0].message.content
-    // This is a simplified parsing. In production, use more robust parsing
-    const pattern: LearningPattern = {
-      strongAreas: [],
-      weakAreas: [],
-      recommendedTopics: [],
-      learningStyle: "",
-      conceptualUnderstanding: {}
+      if (!response.data.choices[0].message?.content) {
+        throw new Error('No response from OpenAI')
+      }
+
+      const analysis = JSON.parse(response.data.choices[0].message.content)
+      return analysis as LearningPattern
+    } catch (error) {
+      console.error('Error analyzing learning pattern:', error)
+      throw new Error('Failed to analyze learning pattern')
     }
-
-    // Parse the analysis text to populate the pattern object
-    // This would be more sophisticated in production
-    return pattern
   }
 
-  private static async generatePersonalizedPrompt(pattern: LearningPattern): string {
-    const prompt = `
-      Create a personalized tutoring approach based on:
-      - Strong areas: ${pattern.strongAreas.join(', ')}
-      - Areas for improvement: ${pattern.weakAreas.join(', ')}
-      - Learning style: ${pattern.learningStyle}
-      - Current understanding levels: ${JSON.stringify(pattern.conceptualUnderstanding)}
-    `
+  static async getPersonalizedTutoring(userId: string): Promise<PersonalizedTutoring> {
+    try {
+      // Get recent learning events
+      const events = await LearningEventsDB.getByUserId(userId, { limit: 50 })
+      if (!events?.length) {
+        throw new Error('No learning events found for user')
+      }
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
+      // Get learning pattern analysis
+      const pattern = await this.analyzeLearningPattern(events)
+
+      // Get engagement metrics
+      const stats = await LearningEventsDB.getStats(userId)
+
+      // Calculate engagement metrics
+      const engagementMetrics: EngagementMetrics = {
+        questionQuality: this.calculateQuestionQuality(events),
+        participationRate: this.calculateParticipationRate(events),
+        conceptConnections: this.calculateConceptConnections(events)
+      }
+
+      // Calculate attention patterns
+      const attentionPatterns = this.calculateAttentionPatterns(events)
+
+      // Generate personalized recommendations
+      const recommendations = await this.generateRecommendations(pattern, engagementMetrics)
+
+      return {
+        tutorPrompt: this.generateTutorPrompt(pattern, engagementMetrics),
+        pattern,
+        behaviorAnalysis: {
+          learningStyle: pattern.learningStyle,
+          conceptualUnderstanding: pattern.conceptualUnderstanding,
+          attentionPatterns,
+          engagementMetrics
+        },
+        recommendations
+      }
+    } catch (error) {
+      console.error('Error getting personalized tutoring:', error)
+      throw error
+    }
+  }
+
+  private static calculateQuestionQuality(events: LearningEvent[]): number {
+    const questions = events.filter(e => e.type === 'question')
+    if (questions.length === 0) return 0
+
+    // Implement question quality scoring logic
+    return 0.75 // Placeholder
+  }
+
+  private static calculateParticipationRate(events: LearningEvent[]): number {
+    // Calculate daily participation rate
+    const days = new Set(events.map(e => e.timestamp.toISOString().split('T')[0])).size
+    return Math.min(1, events.length / (days * 5)) // Assume 5 interactions per day is optimal
+  }
+
+  private static calculateConceptConnections(events: LearningEvent[]): number {
+    // Implement concept connection scoring logic
+    return 0.65 // Placeholder
+  }
+
+  private static calculateAttentionPatterns(events: LearningEvent[]): Record<string, number> {
+    const patterns: Record<string, number> = {}
+    events.forEach(event => {
+      const hour = new Date(event.timestamp).getHours()
+      patterns[hour] = (patterns[hour] || 0) + 1
     })
+    return patterns
+  }
 
-    return response.choices[0].message.content || ""
+  private static async generateRecommendations(
+    pattern: LearningPattern,
+    engagementMetrics: EngagementMetrics
+  ): Promise<{
+    recommendedTopics: string[]
+    studyStrategies: string[]
+    resourceTypes: string[]
+  }> {
+    return {
+      recommendedTopics: pattern.recommendedTopics,
+      studyStrategies: [
+        'Active recall practice',
+        'Spaced repetition',
+        'Mind mapping'
+      ],
+      resourceTypes: [
+        'Interactive quizzes',
+        'Video tutorials',
+        'Practice problems'
+      ]
+    }
+  }
+
+  private static generateTutorPrompt(
+    pattern: LearningPattern,
+    engagementMetrics: EngagementMetrics
+  ): string {
+    return `Focus on ${pattern.weakAreas.join(', ')}. Strengthen understanding through interactive exercises.`
   }
 
   static async logLearningEvent(event: LearningEvent): Promise<void> {
-    // Store events in a database for production
-    // For now, we'll use console.log
-    console.log('Learning event logged:', event)
-  }
-
-  static async getPersonalizedTutoring(userId: string, events: LearningEvent[]): Promise<{
-    tutorPrompt: string
-    pattern: LearningPattern
-    behaviorAnalysis: {
-      learningStyle: string
-      conceptualUnderstanding: Record<string, number>
-      attentionPatterns: Record<string, number>
-      engagementMetrics: {
-        questionQuality: number
-        participationRate: number
-        conceptConnections: number
-      }
-    }
-    recommendations: {
-      recommendedTopics: string[]
-      studyStrategies: string[]
-      resourceTypes: string[]
-    }
-  }> {
-    // Analyze student behavior using ML model
-    const behaviorAnalysis = await MLModelInterface.analyzeStudentBehavior(events)
-
-    // Generate personalized recommendations
-    const studentProfile = {
-      userId,
-      learningStyle: behaviorAnalysis.learningStyle,
-      conceptualUnderstanding: behaviorAnalysis.conceptualUnderstanding,
-    }
-    const recommendations = await MLModelInterface.generatePersonalizedRecommendations(
-      studentProfile,
-      events
-    )
-
-    // Create learning pattern from analysis
-    const pattern: LearningPattern = {
-      strongAreas: Object.entries(behaviorAnalysis.conceptualUnderstanding)
-        .filter(([_, score]) => score >= 0.75)
-        .map(([subject]) => subject),
-      weakAreas: Object.entries(behaviorAnalysis.conceptualUnderstanding)
-        .filter(([_, score]) => score < 0.75)
-        .map(([subject]) => subject),
-      recommendedTopics: recommendations.recommendedTopics,
-      learningStyle: behaviorAnalysis.learningStyle,
-      conceptualUnderstanding: behaviorAnalysis.conceptualUnderstanding,
-    }
-
-    // Generate personalized tutor prompt
-    const tutorPrompt = `Based on your ${pattern.learningStyle} learning style, let's focus on strengthening your understanding of ${pattern.weakAreas.join(', ')}. Your strong foundation in ${pattern.strongAreas.join(', ')} will help you grasp related concepts.`
-
-    return {
-      tutorPrompt,
-      pattern,
-      behaviorAnalysis,
-      recommendations,
+    try {
+      await LearningEventsDB.create(event)
+    } catch (error) {
+      console.error('Error logging learning event:', error)
+      throw new Error('Failed to log learning event')
     }
   }
 }
